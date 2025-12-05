@@ -2,17 +2,19 @@ package ru.alexandr.orderservice.service
 
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
-import ru.alexandr.orderservice.controller.CompanyRegistrationController.LoginRequest
-import ru.alexandr.orderservice.controller.CompanyRegistrationController.RegistrationRequest
+import ru.alexandr.orderservice.controller.JwtResponse
+import ru.alexandr.orderservice.controller.RegistrationRequest
 import ru.alexandr.orderservice.entity.Company
 import ru.alexandr.orderservice.repository.CompanyRepository
+import ru.alexandr.orderservice.util.JwtUtil
 
 @Service
 class CompanyRegistrationService(
     private val companyRepository: CompanyRepository,
-    private val passwordEncoder: PasswordEncoder
+    private val passwordEncoder: PasswordEncoder,
+    private val jwtUtil: JwtUtil,
 ) {
-    fun register(request: RegistrationRequest): Company {
+    fun register(request: RegistrationRequest): JwtResponse {
         if (companyRepository.findByInn(request.inn) != null) {
             throw IllegalArgumentException("Company with this INN already exists")
         }
@@ -23,7 +25,11 @@ class CompanyRegistrationService(
             bik = request.bik,
             companyPassword = passwordEncoder.encode(request.password).toString()
         )
-        return companyRepository.save(company)
+
+
+        val savedCompany = companyRepository.save(company)
+        val token = jwtUtil.generateToken(savedCompany.inn)
+        return JwtResponse(token)
     }
 
 }

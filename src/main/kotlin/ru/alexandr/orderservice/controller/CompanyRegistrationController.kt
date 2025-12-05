@@ -17,20 +17,15 @@ class CompanyRegistrationController(
     private val jwtUtil: JwtUtil
 ) {
 
-    data class RegistrationRequest(val inn: String, val name: String, val bik: String, val password: String)
-    data class JwtResponse(val token: String)
-
     @PostMapping("/register")
     fun register(@RequestBody request: RegistrationRequest): JwtResponse {
-        registrationService.register(request)
-        val token = jwtUtil.generateToken(request.inn)
-        return JwtResponse(token)
+        return registrationService.register(request)
     }
 
     data class LoginRequest(val inn: String, val password: String)
 
-    @PostMapping("/login")
-    fun login(@RequestBody request: LoginRequest): JwtResponse {
+    @PostMapping("/test-login")
+    fun testLogin(@RequestBody request: LoginRequest): JwtResponse {
          authenticationManager.authenticate(
             UsernamePasswordAuthenticationToken(request.inn, request.password)
         )
@@ -38,3 +33,6 @@ class CompanyRegistrationController(
         return JwtResponse(token)
     }
 }
+
+data class RegistrationRequest(val inn: String, val name: String, val bik: String, val password: String)
+data class JwtResponse(val token: String)
