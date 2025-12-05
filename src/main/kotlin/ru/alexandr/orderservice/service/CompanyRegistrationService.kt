@@ -14,10 +14,8 @@ class CompanyRegistrationService(
     private val passwordEncoder: PasswordEncoder,
     private val jwtUtil: JwtUtil,
 ) {
-    fun register(request: RegistrationRequest): JwtResponse {
-        if (companyRepository.findByInn(request.inn) != null) {
-            throw IllegalArgumentException("Company with this INN already exists")
-        }
+    fun register(request: RegistrationRequest): Company {
+        require(companyRepository.findByInn(request.inn) != null)
 
         val company = Company(
             inn = request.inn,
