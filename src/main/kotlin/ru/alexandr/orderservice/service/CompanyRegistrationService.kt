@@ -1,0 +1,29 @@
+package ru.alexandr.orderservice.service
+
+import org.springframework.security.crypto.password.PasswordEncoder
+import org.springframework.stereotype.Service
+import ru.alexandr.orderservice.controller.CompanyRegistrationController.LoginRequest
+import ru.alexandr.orderservice.controller.CompanyRegistrationController.RegistrationRequest
+import ru.alexandr.orderservice.entity.Company
+import ru.alexandr.orderservice.repository.CompanyRepository
+
+@Service
+class CompanyRegistrationService(
+    private val companyRepository: CompanyRepository,
+    private val passwordEncoder: PasswordEncoder
+) {
+    fun register(request: RegistrationRequest): Company {
+        if (companyRepository.findByInn(request.inn) != null) {
+            throw IllegalArgumentException("Company with this INN already exists")
+        }
+
+        val company = Company(
+            inn = request.inn,
+            name = request.name,
+            bik = request.bik,
+            companyPassword = passwordEncoder.encode(request.password).toString()
+        )
+        return companyRepository.save(company)
+    }
+
+}
