@@ -24,7 +24,7 @@ class CompanyRegistrationController(
 
     data class LoginRequest(val inn: String, val password: String)
 
-    @PostMapping("/test-login")
+    @PostMapping("/login")
     fun testLogin(@RequestBody request: LoginRequest): JwtResponse {
          authenticationManager.authenticate(
             UsernamePasswordAuthenticationToken(request.inn, request.password)

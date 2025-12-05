@@ -15,7 +15,7 @@ class CompanyRegistrationService(
     private val jwtUtil: JwtUtil,
 ) {
     fun register(request: RegistrationRequest): JwtResponse {
-        require(companyRepository.findByInn(request.inn) != null)
+        require(companyRepository.findByInn(request.inn) == null)
 
         val company = Company(
             inn = request.inn,

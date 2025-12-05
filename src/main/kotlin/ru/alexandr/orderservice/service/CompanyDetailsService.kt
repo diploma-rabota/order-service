@@ -11,8 +11,7 @@ class CompanyDetailsService(
     private val companyRepository: CompanyRepository
 ) : UserDetailsService {
     override fun loadUserByUsername(username: String): UserDetails {
-        val s = companyRepository.findByInn(username)
+        return  companyRepository.findByInn(username)
             ?: throw UsernameNotFoundException("Company not found")
-        return s
     }
 }
