@@ -1,4 +1,4 @@
-package ru.alexandr.orderservice.util
+package ru.alexandr.orderservice.util.jwt
 
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.SignatureAlgorithm

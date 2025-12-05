@@ -1,4 +1,4 @@
-package ru.alexandr.orderservice.config
+package ru.alexandr.orderservice.util.jwt
 
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
@@ -8,13 +8,12 @@ import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
-import ru.alexandr.orderservice.service.CompanyDetailsService
-import ru.alexandr.orderservice.util.JwtUtil
+import ru.alexandr.orderservice.service.UserDetailsService
 
 @Component
 class JwtAuthenticationFilter(
     private val jwtUtil: JwtUtil,
-    private val companyDetailsService: CompanyDetailsService
+    private val userDetailsService: UserDetailsService
 ) : OncePerRequestFilter() {
 
     override fun doFilterInternal(
@@ -27,7 +26,7 @@ class JwtAuthenticationFilter(
             val token = authHeader.substring(7)
             val inn = jwtUtil.extractUsername(token)
             if (inn != null && SecurityContextHolder.getContext().authentication == null) {
-                val companyDetails = companyDetailsService.loadUserByUsername(inn)
+                val companyDetails = userDetailsService.loadUserByUsername(inn)
                 if (jwtUtil.validateToken(token)) {
                     val authToken = UsernamePasswordAuthenticationToken(
                         companyDetails, null, companyDetails.authorities

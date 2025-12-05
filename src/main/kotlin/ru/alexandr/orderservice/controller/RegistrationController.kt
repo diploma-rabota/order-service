@@ -6,14 +6,14 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
-import ru.alexandr.orderservice.service.CompanyRegistrationService
-import ru.alexandr.orderservice.util.JwtUtil
+import ru.alexandr.orderservice.service.RegistrationService
+import ru.alexandr.orderservice.util.jwt.JwtUtil
 
 @RestController
 @RequestMapping("/api")
 class CompanyRegistrationController(
     private val authenticationManager: AuthenticationManager,
-    private val registrationService: CompanyRegistrationService,
+    private val registrationService: RegistrationService,
     private val jwtUtil: JwtUtil
 ) {
 
@@ -22,17 +22,22 @@ class CompanyRegistrationController(
         return registrationService.register(request)
     }
 
-    data class LoginRequest(val inn: String, val password: String)
-
     @PostMapping("/login")
     fun testLogin(@RequestBody request: LoginRequest): JwtResponse {
          authenticationManager.authenticate(
-            UsernamePasswordAuthenticationToken(request.inn, request.password)
+            UsernamePasswordAuthenticationToken(request.email, request.password)
         )
-        val token = jwtUtil.generateToken(request.inn)
+        val token = jwtUtil.generateToken(request.email)
         return JwtResponse(token)
     }
 }
 
-data class RegistrationRequest(val inn: String, val name: String, val bik: String, val password: String)
+data class RegistrationRequest(
+    val username: String,
+    val password: String,
+    val email: String,
+    val address: String
+)
 data class JwtResponse(val token: String)
+
+data class LoginRequest(val email: String, val password: String)

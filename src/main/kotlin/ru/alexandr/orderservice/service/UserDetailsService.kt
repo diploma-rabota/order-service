@@ -4,14 +4,14 @@ import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.security.core.userdetails.UserDetailsService
 import org.springframework.security.core.userdetails.UsernameNotFoundException
 import org.springframework.stereotype.Service
-import ru.alexandr.orderservice.repository.CompanyRepository
+import ru.alexandr.orderservice.repository.UserRepository
 
 @Service
-class CompanyDetailsService(
-    private val companyRepository: CompanyRepository
+class UserDetailsService(
+    private val repository: UserRepository
 ) : UserDetailsService {
     override fun loadUserByUsername(username: String): UserDetails {
-        return  companyRepository.findByInn(username)
+        return  repository.findByEmail(username)
             ?: throw UsernameNotFoundException("Company not found")
     }
 }

@@ -10,11 +10,10 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
-import ru.alexandr.orderservice.service.CompanyDetailsService
+import ru.alexandr.orderservice.util.jwt.JwtAuthenticationFilter
 
 @Configuration
 class SecurityConfig(
-    private val companyDetailsService: CompanyDetailsService,
     private val jwtAuthenticationFilter: JwtAuthenticationFilter
 ) {
 
