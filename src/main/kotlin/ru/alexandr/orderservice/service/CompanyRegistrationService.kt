@@ -14,7 +14,7 @@ class CompanyRegistrationService(
     private val passwordEncoder: PasswordEncoder,
     private val jwtUtil: JwtUtil,
 ) {
-    fun register(request: RegistrationRequest): Company {
+    fun register(request: RegistrationRequest): JwtResponse {
         require(companyRepository.findByInn(request.inn) != null)
 
         val company = Company(
