@@ -22,6 +22,11 @@ class CompanyRegistrationController(
         return registrationService.register(request)
     }
 
+    @PostMapping("/register-company")
+    fun registerCompany(@RequestBody request: RegisterCompanyRequest) {
+         registrationService.registerCompany(request)
+    }
+
     @PostMapping("/login")
     fun testLogin(@RequestBody request: LoginRequest): JwtResponse {
          authenticationManager.authenticate(
@@ -38,6 +43,15 @@ data class RegistrationRequest(
     val email: String,
     val address: String
 )
+
+data class RegisterCompanyRequest(
+    val inn: String,
+    val bik: String,
+    val name: String,
+    val address: String
+)
+
+
 data class JwtResponse(val token: String)
 
 data class LoginRequest(val email: String, val password: String)

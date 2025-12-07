@@ -6,5 +6,5 @@ create table if not exists company (
         inn varchar(20) not null,
         bik varchar(20) not null,
         name varchar(255) not null,
-        adress varchar(255) not null
+        address varchar(255) not null
     );
