@@ -1,4 +1,4 @@
-package ru.alexandr.orderservice.config
+package ru.alexandr.orderservice.config.security
 
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -10,7 +10,6 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
-import ru.alexandr.orderservice.util.jwt.JwtAuthenticationFilter
 
 @Configuration
 class SecurityConfig(

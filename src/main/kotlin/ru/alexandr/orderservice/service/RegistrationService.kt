@@ -5,12 +5,15 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
+import ru.alexandr.orderservice.config.security.CustomUserDetails
+import ru.alexandr.orderservice.config.security.SecurityUtils.getEmail
 import ru.alexandr.orderservice.controller.JwtResponse
 import ru.alexandr.orderservice.controller.LoginRequest
 import ru.alexandr.orderservice.controller.RegisterCompanyRequest
 import ru.alexandr.orderservice.controller.RegistrationRequest
 import ru.alexandr.orderservice.entity.Company
 import ru.alexandr.orderservice.entity.User
+import ru.alexandr.orderservice.entity.toCustomUserDetails
 import ru.alexandr.orderservice.repository.CompanyRepository
 import ru.alexandr.orderservice.repository.UserRepository
 import ru.alexandr.orderservice.util.jwt.JwtUtil
@@ -33,13 +36,13 @@ class RegistrationService(
         )
 
         val savedUser = userRepository.save(user)
-        val token = jwtUtil.generateToken(savedUser)
+        val token = jwtUtil.generateToken(savedUser.toCustomUserDetails())
         return JwtResponse(token)
     }
 
     @Transactional
     fun registerCompany(request: RegisterCompanyRequest){
-        val email = SecurityContextHolder.getContext().authentication?.name
+        val email = getEmail()
         val user = userRepository.findByEmail(email!!)
 
         val company = Company(
@@ -59,7 +62,7 @@ class RegistrationService(
         val auth = authenticationManager.authenticate(
             UsernamePasswordAuthenticationToken(request.email, request.password)
         )
-        val user = auth.principal as User
+        val user = auth.principal as CustomUserDetails
 
         val token = jwtUtil.generateToken(user)
         return JwtResponse(token)

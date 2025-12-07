@@ -7,8 +7,7 @@ import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.SequenceGenerator
 import jakarta.persistence.Table
-import org.springframework.security.core.GrantedAuthority
-import org.springframework.security.core.userdetails.UserDetails
+import ru.alexandr.orderservice.config.security.CustomUserDetails
 
 @Entity
 @Table(name = "duser")
@@ -36,16 +35,12 @@ data class User (
 
     @Column
     val address: String,
+)
 
-) : UserDetails {
-
-    override fun getAuthorities(): MutableCollection<out GrantedAuthority> =
-        mutableListOf(GrantedAuthority { "ROLE_USER" })
-
-    override fun getPassword() = userPassword
-    override fun getUsername() = email
-    override fun isAccountNonExpired() = true
-    override fun isAccountNonLocked() = true
-    override fun isCredentialsNonExpired() = true
-    override fun isEnabled() = true
+fun User.toCustomUserDetails() : CustomUserDetails {
+    return CustomUserDetails(
+        email = email,
+        companyId = companyId,
+        password = userPassword,
+        )
 }

@@ -1,4 +1,4 @@
-package ru.alexandr.orderservice.util.jwt
+package ru.alexandr.orderservice.config.security
 
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
@@ -9,6 +9,7 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
 import ru.alexandr.orderservice.service.UserDetailsService
+import ru.alexandr.orderservice.util.jwt.JwtUtil
 
 @Component
 class JwtAuthenticationFilter(
@@ -22,20 +23,39 @@ class JwtAuthenticationFilter(
         filterChain: FilterChain
     ) {
         val authHeader = request.getHeader("Authorization")
+
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            println("HEADER OK: $authHeader")
+
             val token = authHeader.substring(7)
-            val inn = jwtUtil.extractUsername(token)
-            if (inn != null && SecurityContextHolder.getContext().authentication == null) {
-                val companyDetails = userDetailsService.loadUserByUsername(inn)
+            println("TOKEN = $token")
+
+            val email = jwtUtil.extractUsername(token)
+            println("EMAIL FROM TOKEN = $email")
+
+
+            if (email != null && SecurityContextHolder.getContext().authentication == null) {
+
+                val userDetails = userDetailsService.loadUserByUsername(email)
+                println("USER DETAILS LOADED: ${userDetails.username}")
+
                 if (jwtUtil.validateToken(token)) {
+
                     val authToken = UsernamePasswordAuthenticationToken(
-                        companyDetails, null, companyDetails.authorities
+                        userDetails,
+                        null,
+                        userDetails.authorities
                     )
-                    authToken.details = WebAuthenticationDetailsSource().buildDetails(request)
+
+                    authToken.details =
+                        WebAuthenticationDetailsSource().buildDetails(request)
+
                     SecurityContextHolder.getContext().authentication = authToken
                 }
             }
         }
+        println("AUTH = " + SecurityContextHolder.getContext().authentication)
+
         filterChain.doFilter(request, response)
     }
 }
