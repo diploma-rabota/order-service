@@ -1,9 +1,12 @@
 package ru.alexandr.orderservice.service
 import jakarta.transaction.Transactional
+import org.springframework.security.authentication.AuthenticationManager
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import ru.alexandr.orderservice.controller.JwtResponse
+import ru.alexandr.orderservice.controller.LoginRequest
 import ru.alexandr.orderservice.controller.RegisterCompanyRequest
 import ru.alexandr.orderservice.controller.RegistrationRequest
 import ru.alexandr.orderservice.entity.Company
@@ -14,13 +17,14 @@ import ru.alexandr.orderservice.util.jwt.JwtUtil
 
 @Service
 class RegistrationService(
-    private val repository: UserRepository,
+    private val userRepository: UserRepository,
     private val companyRepository: CompanyRepository,
     private val passwordEncoder: PasswordEncoder,
     private val jwtUtil: JwtUtil,
-) {
+    private val authenticationManager: AuthenticationManager,
+    ) {
     fun register(request: RegistrationRequest): JwtResponse {
-        require(repository.findByEmail(request.email) == null)
+        require(userRepository.findByEmail(request.email) == null)
         val user = User(
             email = request.email,
             userName = request.username,
@@ -28,15 +32,15 @@ class RegistrationService(
             address = request.address,
         )
 
-        val savedCompany = repository.save(user)
-        val token = jwtUtil.generateToken(savedCompany.email)
+        val savedUser = userRepository.save(user)
+        val token = jwtUtil.generateToken(savedUser)
         return JwtResponse(token)
     }
 
     @Transactional
     fun registerCompany(request: RegisterCompanyRequest){
         val email = SecurityContextHolder.getContext().authentication?.name
-        val user = repository.findByEmail(email!!)
+        val user = userRepository.findByEmail(email!!)
 
         val company = Company(
             inn = request.inn,
@@ -46,9 +50,19 @@ class RegistrationService(
         )
         companyRepository.save(company)
 
-        repository.save(user!!.copy(
+        userRepository.save(user!!.copy(
             companyId = company.id,
         ))
+    }
+
+    fun login(request: LoginRequest): JwtResponse {
+        val auth = authenticationManager.authenticate(
+            UsernamePasswordAuthenticationToken(request.email, request.password)
+        )
+        val user = auth.principal as User
+
+        val token = jwtUtil.generateToken(user)
+        return JwtResponse(token)
     }
 
 }

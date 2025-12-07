@@ -12,9 +12,7 @@ import ru.alexandr.orderservice.util.jwt.JwtUtil
 @RestController
 @RequestMapping("/api")
 class CompanyRegistrationController(
-    private val authenticationManager: AuthenticationManager,
     private val registrationService: RegistrationService,
-    private val jwtUtil: JwtUtil
 ) {
 
     @PostMapping("/register")
@@ -29,11 +27,7 @@ class CompanyRegistrationController(
 
     @PostMapping("/login")
     fun testLogin(@RequestBody request: LoginRequest): JwtResponse {
-         authenticationManager.authenticate(
-            UsernamePasswordAuthenticationToken(request.email, request.password)
-        )
-        val token = jwtUtil.generateToken(request.email)
-        return JwtResponse(token)
+         return registrationService.login(request)
     }
 }
 

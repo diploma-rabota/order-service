@@ -4,6 +4,7 @@ import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.SignatureAlgorithm
 import io.jsonwebtoken.security.Keys
 import org.springframework.stereotype.Component
+import ru.alexandr.orderservice.entity.User
 import java.util.Date
 
 @Component
@@ -11,11 +12,21 @@ class JwtUtil {
     private val key = Keys.secretKeyFor(SignatureAlgorithm.HS256)
     private val expiration = 1000 * 60 * 60 * 24 // 24 часа
 
-    fun generateToken(inn: String): String {
+    fun generateToken(user: User): String {
+        val claims = mutableMapOf<String, Any>(
+            "email" to user.email,
+        )
+
+        user.companyId?.let {
+            claims["companyId"] = it
+        }
+
         val now = Date()
         val expiryDate = Date(now.time + expiration)
+
         return Jwts.builder()
-            .setSubject(inn)
+            .setClaims(claims)
+            .setSubject(user.email)
             .setIssuedAt(now)
             .setExpiration(expiryDate)
             .signWith(key)
