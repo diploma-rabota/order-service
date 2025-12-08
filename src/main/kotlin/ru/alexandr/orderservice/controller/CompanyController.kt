@@ -5,7 +5,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import ru.alexandr.orderservice.service.CompanyProductsService
-import ru.alexandr.orderservice.util.jwt.UnitType
+import ru.alexandr.orderservice.util.UnitType
 
 @RestController
 @RequestMapping("/company")
@@ -27,6 +27,10 @@ data class ProductCreateRequest(
     val availableQuantity: Long,
     val unit: UnitType,
     val priceRetail: Long,
-    val priceWholesale: Long,
-    val minQuantityWholesale: Long
+    val priceTiers: List<PriceTierRequest>,
+)
+
+data class PriceTierRequest(
+    val quantityFrom: Long,
+    val pricePerUnit: Long
 )

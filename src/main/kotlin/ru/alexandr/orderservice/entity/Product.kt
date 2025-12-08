@@ -9,18 +9,18 @@ import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.SequenceGenerator
 import jakarta.persistence.Table
-import ru.alexandr.orderservice.util.jwt.UnitType
+import ru.alexandr.orderservice.util.UnitType
 import java.time.LocalDateTime
 
 @Entity
-@Table(name = "products")
+@Table(name = "product")
 data class Product(
 
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "sqn_products")
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "sqn_product")
     @SequenceGenerator(
-        name = "sqn_products",
-        sequenceName = "sqn_products",
+        name = "sqn_product",
+        sequenceName = "sqn_product",
         allocationSize = 1
     )
     val id: Long = 0,
@@ -46,12 +46,6 @@ data class Product(
 
     @Column(name = "price_retail")
     val priceRetail: Long,
-
-    @Column(name = "price_wholesale")
-    val priceWholesale: Long,
-
-    @Column(name = "min_quantity_wholesale")
-    val minQuantityWholesale: Long,
 
     @Column(name = "updated_at")
     var updatedAt: LocalDateTime? = null

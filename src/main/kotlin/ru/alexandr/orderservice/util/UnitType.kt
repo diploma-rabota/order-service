@@ -1,4 +1,4 @@
-package ru.alexandr.orderservice.util.jwt
+package ru.alexandr.orderservice.util
 
 enum class UnitType {
     KG,
