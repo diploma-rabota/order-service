@@ -10,7 +10,7 @@ import jakarta.persistence.Table
 
 @Entity
 @Table(name = "price_tier")
-data class PriceTier(
+data class PriceTier (
 
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "sqn_price")
@@ -24,9 +24,10 @@ data class PriceTier(
     @Column
     val productId: Long,
 
-    @Column()
+    @Column
     val quantityFrom: Long,
 
     @Column
     val pricePerUnit: Long,
-)
+
+    )
