@@ -12,6 +12,7 @@ create table if not exists cart (
                       constraint fk_cart_company
                           foreign key (company_id)
                               references company (id),
+                      total_sum bigint not null,
                       created_at timestamp default now(),
                       updated_at timestamp default now()
 );

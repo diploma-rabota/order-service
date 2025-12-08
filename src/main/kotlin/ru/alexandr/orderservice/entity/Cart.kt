@@ -28,6 +28,9 @@ class Cart(
     @Column(name = "company_id")
     val companyId: Long,
 
+    @Column
+    val totalSum: Long,
+
     @Column(name = "created_at")
     val createdAt: LocalDateTime? = null,
 

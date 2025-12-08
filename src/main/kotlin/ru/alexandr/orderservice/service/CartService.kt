@@ -6,8 +6,10 @@ import ru.alexandr.orderservice.config.security.SecurityUtils.getEmail
 import ru.alexandr.orderservice.controller.AddToCartRequest
 import ru.alexandr.orderservice.entity.Cart
 import ru.alexandr.orderservice.entity.CartItem
+import ru.alexandr.orderservice.entity.PriceTier
 import ru.alexandr.orderservice.repository.CartItemRepository
 import ru.alexandr.orderservice.repository.CartRepository
+import ru.alexandr.orderservice.repository.PriceTierRepository
 import ru.alexandr.orderservice.repository.ProductRepository
 import ru.alexandr.orderservice.repository.UserRepository
 
@@ -17,6 +19,7 @@ class CartService(
     private val cartRepository: CartRepository,
     private val productRepository: ProductRepository,
     private val userRepository: UserRepository,
+    private val priceTierRepository: PriceTierRepository,
 ) {
 
     @Transactional
@@ -24,32 +27,35 @@ class CartService(
         val product = productRepository.findById(request.productId)
             .orElseThrow { IllegalArgumentException("Product not found") }
 
+        require(request.quantity <= product.availableQuantity) {
+            "Requested quantity ${request.quantity} exceeds available ${product.availableQuantity}"
+        }
+
         val userEmail = getEmail() ?: throw IllegalStateException("User not authenticated")
         val user = userRepository.findByEmail(userEmail)
             ?: throw IllegalStateException("User not found")
 
-        // 1️⃣ Проверяем количество товара
-        if (product.availableQuantity < request.quantity) {
-            throw IllegalArgumentException(
-                "Requested quantity ${request.quantity} exceeds available ${product.availableQuantity}"
-            )
+        val unitPrice = calculateUnitPrice(priceTierRepository.findPriceTiersByProductId(product.id),
+            request.quantity)?: product.priceRetail
+
+        val totalItemSum = unitPrice * request.quantity
+
+        val cart = cartRepository.findByUserIdAndCompanyId(user.id, product.companyId)
+
+        if (cart != null) {
+            val newSumm = cart.totalSum * totalItemSum
+            cartRepository.updateTotalSumById(cart.id, newSumm)
+
+            cartItemRepository.save(createCartItem(cart.id, product.id, request.quantity))
+
+            return cart.id
         }
 
-        // 2️⃣ Ищем корзину ДЛЯ ЭТОЙ компании
-        val cartForThisCompany =
-            cartRepository.findByUserIdAndCompanyId(user.id, product.companyId)
-
-        // 3️⃣ Если корзина найдена → кладём туда
-        if (cartForThisCompany != null) {
-            cartItemRepository.save(createCartItem(cartForThisCompany.id, product.id, request.quantity))
-            return cartForThisCompany.id
-        }
-
-        // 4️⃣ Корзины для этой компании нет → создаём новую
         val newCart = cartRepository.save(
             Cart(
                 userId = user.id,
-                companyId = product.companyId
+                companyId = product.companyId,
+                totalSum = totalItemSum
             )
         )
 
@@ -64,5 +70,15 @@ class CartService(
             productId = productId,
             quantity = quantity,
         )
+
+
+    private fun calculateUnitPrice(wholesalePrices: List<PriceTier>, qty: Long): Long? {
+        val wholesale = wholesalePrices
+            .filter { qty >= it.quantityFrom }
+            .maxByOrNull { it.quantityFrom }
+
+        return wholesale?.pricePerUnit
+    }
+
 
 }
