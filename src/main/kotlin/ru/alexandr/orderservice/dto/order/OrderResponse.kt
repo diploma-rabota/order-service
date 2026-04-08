@@ -15,6 +15,7 @@ data class OrderItemResponse(
 data class OrderResponse(
     val id: Long,
     val userId: Long,
+    val userEmail: String,
     val status: OrderStatus,
     val totalAmount: BigDecimal,
     val createdAt: LocalDateTime,

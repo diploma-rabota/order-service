@@ -21,3 +21,8 @@ clients:
     url: http://localhost:8081
   user-service:
     url: http://localhost:8083
+
+
+security:
+  jwt:
+    secret: "very-secret-key-very-secret-key-1234567890"

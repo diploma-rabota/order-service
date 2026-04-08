@@ -1,6 +1,5 @@
 package ru.alexandr.orderservice.controller
 
-
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.*
 import ru.alexandr.orderservice.dto.order.OrderResponse
@@ -13,12 +12,10 @@ class OrderController(
     private val orderService: OrderService
 ) {
 
-    @PostMapping("/{userId}/checkout")
+    @PostMapping("/checkout")
     @ResponseStatus(HttpStatus.CREATED)
-    fun checkout(
-        @PathVariable userId: Long
-    ): OrderResponse {
-        return orderService.checkout(userId)
+    fun checkout(): OrderResponse {
+        return orderService.checkout()
     }
 
     @GetMapping("/{orderId}")
@@ -28,17 +25,15 @@ class OrderController(
         return orderService.getOrderById(orderId)
     }
 
-    @GetMapping
-    fun getOrdersByUserId(
-        @RequestParam userId: Long
-    ): List<OrderResponse> {
-        return orderService.getOrdersByUserId(userId)
+    @GetMapping("/my")
+    fun getMyOrders(): List<OrderResponse> {
+        return orderService.getMyOrders()
     }
 
     @PatchMapping("/{orderId}/status")
     fun updateStatus(
         @PathVariable orderId: Long,
-        @RequestBody  request: UpdateOrderStatusRequest
+        @RequestBody request: UpdateOrderStatusRequest
     ): OrderResponse {
         return orderService.updateStatus(orderId, request)
     }

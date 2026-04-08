@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import ru.alexandr.orderservice.dto.ErrorResponse
+import ru.alexandr.orderservice.exception.UnauthorizedException
 import ru.alexandr.orderservice.exception.UserNotFoundException
 
 @RestControllerAdvice
@@ -21,6 +22,14 @@ class GlobalExceptionHandler {
                     message = ex.message ?: "Пользователь не найден"
                 )
             )
+    }
+
+
+    @ExceptionHandler(UnauthorizedException::class)
+    fun handleUnauthorized(ex: UnauthorizedException): ResponseEntity<Map<String, String>> {
+        return ResponseEntity
+            .status(HttpStatus.UNAUTHORIZED)
+            .body(mapOf("message" to (ex.message ?: "Unauthorized")))
     }
 
     @ExceptionHandler(FeignException::class)

@@ -29,6 +29,9 @@ data class OrderEntity(
     @Column(name = "user_id", nullable = false)
     val userId: Long,
 
+    @Column(name = "user_email", nullable = false)
+    val userEmail: String,
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
     val status: OrderStatus = OrderStatus.NEW,

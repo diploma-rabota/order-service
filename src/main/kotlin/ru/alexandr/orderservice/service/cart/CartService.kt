@@ -6,17 +6,16 @@ import ru.alexandr.orderservice.dto.cart.UpdateCartItemQuantityRequest
 
 interface CartService {
 
-    fun getCart(userId: Long): CartResponse
+    fun getCart(): CartResponse
 
-    fun addItem(userId: Long, request: AddCartItemRequest): CartResponse
+    fun addItem(request: AddCartItemRequest): CartResponse
 
     fun updateItemQuantity(
-        userId: Long,
         productArticle: String,
         request: UpdateCartItemQuantityRequest
     ): CartResponse
 
-    fun removeItem(userId: Long, productArticle: String): CartResponse
+    fun removeItem(productArticle: String): CartResponse
 
-    fun clearCart(userId: Long)
+    fun clearCart()
 }

@@ -1,30 +1,29 @@
 package ru.alexandr.orderservice.service.cart
 
-import feign.FeignException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import ru.alexandr.orderservice.client.UserClient
 import ru.alexandr.orderservice.dto.cart.AddCartItemRequest
 import ru.alexandr.orderservice.dto.cart.CartItemResponse
 import ru.alexandr.orderservice.dto.cart.CartResponse
 import ru.alexandr.orderservice.dto.cart.UpdateCartItemQuantityRequest
 import ru.alexandr.orderservice.entity.CartEntity
 import ru.alexandr.orderservice.entity.CartItemEntity
-import ru.alexandr.orderservice.exception.UserNotFoundException
 import ru.alexandr.orderservice.repository.CartItemRepository
 import ru.alexandr.orderservice.repository.CartRepository
+import ru.alexandr.orderservice.security.CurrentUserProvider
 import java.time.LocalDateTime
 
 @Service
 class CartServiceImpl(
     private val cartRepository: CartRepository,
     private val cartItemRepository: CartItemRepository,
-    private val userClient: UserClient,
+    private val currentUserProvider: CurrentUserProvider,
 ) : CartService {
 
     @Transactional(readOnly = true)
-    override fun getCart(userId: Long): CartResponse {
-        ensureUserExists(userId)
+    override fun getCart(): CartResponse {
+        val userId = currentUserProvider.getCurrentUserId()
+
         val cart = cartRepository.findByUserId(userId).orElse(null)
             ?: return emptyCart(userId)
 
@@ -32,8 +31,9 @@ class CartServiceImpl(
     }
 
     @Transactional
-    override fun addItem(userId: Long, request: AddCartItemRequest): CartResponse {
-        ensureUserExists(userId)
+    override fun addItem(request: AddCartItemRequest): CartResponse {
+        val userId = currentUserProvider.getCurrentUserId()
+
         validateProductArticle(request.productArticle)
         validateQuantity(request.quantity)
 
@@ -71,11 +71,11 @@ class CartServiceImpl(
 
     @Transactional
     override fun updateItemQuantity(
-        userId: Long,
         productArticle: String,
         request: UpdateCartItemQuantityRequest
     ): CartResponse {
-        ensureUserExists(userId)
+        val userId = currentUserProvider.getCurrentUserId()
+
         validateProductArticle(productArticle)
         validateQuantity(request.quantity)
 
@@ -100,8 +100,9 @@ class CartServiceImpl(
     }
 
     @Transactional
-    override fun removeItem(userId: Long, productArticle: String): CartResponse {
-        ensureUserExists(userId)
+    override fun removeItem(productArticle: String): CartResponse {
+        val userId = currentUserProvider.getCurrentUserId()
+
         validateProductArticle(productArticle)
 
         val cart = cartRepository.findByUserId(userId).orElse(null)
@@ -118,8 +119,9 @@ class CartServiceImpl(
     }
 
     @Transactional
-    override fun clearCart(userId: Long) {
-        ensureUserExists(userId)
+    override fun clearCart() {
+        val userId = currentUserProvider.getCurrentUserId()
+
         val cart = cartRepository.findByUserId(userId).orElse(null) ?: return
 
         cartItemRepository.deleteAllByCartId(requireNotNull(cart.id))
@@ -184,16 +186,6 @@ class CartServiceImpl(
     private fun validateQuantity(quantity: Int) {
         require(quantity > 0) {
             "Количество товара должно быть больше 0"
-        }
-    }
-
-    private fun ensureUserExists(userId: Long) {
-        try {
-            userClient.getUserById(userId)
-        } catch (ex: FeignException.NotFound) {
-            throw UserNotFoundException("Пользователь с id=$userId не найден")
-        } catch (ex: FeignException) {
-            throw IllegalStateException("Ошибка при обращении к user-service")
         }
     }
 }

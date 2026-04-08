@@ -44,6 +44,7 @@ create table if not exists orders
 (
     id            bigint primary key default nextval('sqn_order'),
     user_id       bigint         not null,
+    user_email    varchar(50)    not null,
     status        varchar(50)    not null,
     total_amount  numeric(19, 2) not null,
     created_at    timestamp      not null default current_timestamp,

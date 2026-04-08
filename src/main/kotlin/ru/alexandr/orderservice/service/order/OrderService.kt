@@ -5,11 +5,11 @@ import ru.alexandr.orderservice.dto.order.UpdateOrderStatusRequest
 
 interface OrderService {
 
-    fun checkout(userId: Long): OrderResponse
+    fun checkout(): OrderResponse
 
     fun getOrderById(orderId: Long): OrderResponse
 
-    fun getOrdersByUserId(userId: Long): List<OrderResponse>
+    fun getMyOrders(): List<OrderResponse>
 
     fun updateStatus(orderId: Long, request: UpdateOrderStatusRequest): OrderResponse
 }

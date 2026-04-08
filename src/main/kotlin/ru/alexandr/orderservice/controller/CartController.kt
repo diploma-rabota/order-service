@@ -13,44 +13,37 @@ class CartController(
     private val cartService: CartService
 ) {
 
-    @GetMapping("/{userId}")
-    fun getCart(
-        @PathVariable userId: Long
-    ): CartResponse {
-        return cartService.getCart(userId)
+    @GetMapping
+    fun getCart(): CartResponse {
+        return cartService.getCart()
     }
 
-    @PostMapping("/{userId}/items")
+    @PostMapping("/items")
     @ResponseStatus(HttpStatus.CREATED)
     fun addItem(
-        @PathVariable userId: Long,
-        @RequestBody  request: AddCartItemRequest
+        @RequestBody request: AddCartItemRequest
     ): CartResponse {
-        return cartService.addItem(userId, request)
+        return cartService.addItem(request)
     }
 
-    @PutMapping("/{userId}/items/{productArticle}")
+    @PutMapping("/items/{productArticle}")
     fun updateItemQuantity(
-        @PathVariable userId: Long,
         @PathVariable productArticle: String,
-        @RequestBody  request: UpdateCartItemQuantityRequest
+        @RequestBody request: UpdateCartItemQuantityRequest
     ): CartResponse {
-        return cartService.updateItemQuantity(userId, productArticle, request)
+        return cartService.updateItemQuantity(productArticle, request)
     }
 
-    @DeleteMapping("/{userId}/items/{productArticle}")
+    @DeleteMapping("/items/{productArticle}")
     fun removeItem(
-        @PathVariable userId: Long,
         @PathVariable productArticle: String
     ): CartResponse {
-        return cartService.removeItem(userId, productArticle)
+        return cartService.removeItem(productArticle)
     }
 
-    @DeleteMapping("/{userId}/items")
+    @DeleteMapping("/items")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun clearCart(
-        @PathVariable userId: Long
-    ) {
-        cartService.clearCart(userId)
+    fun clearCart() {
+        cartService.clearCart()
     }
 }
