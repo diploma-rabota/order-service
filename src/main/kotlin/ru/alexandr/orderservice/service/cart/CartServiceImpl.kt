@@ -1,0 +1,199 @@
+package ru.alexandr.orderservice.service.cart
+
+import feign.FeignException
+import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+import ru.alexandr.orderservice.client.UserClient
+import ru.alexandr.orderservice.dto.cart.AddCartItemRequest
+import ru.alexandr.orderservice.dto.cart.CartItemResponse
+import ru.alexandr.orderservice.dto.cart.CartResponse
+import ru.alexandr.orderservice.dto.cart.UpdateCartItemQuantityRequest
+import ru.alexandr.orderservice.entity.CartEntity
+import ru.alexandr.orderservice.entity.CartItemEntity
+import ru.alexandr.orderservice.exception.UserNotFoundException
+import ru.alexandr.orderservice.repository.CartItemRepository
+import ru.alexandr.orderservice.repository.CartRepository
+import java.time.LocalDateTime
+
+@Service
+class CartServiceImpl(
+    private val cartRepository: CartRepository,
+    private val cartItemRepository: CartItemRepository,
+    private val userClient: UserClient,
+) : CartService {
+
+    @Transactional(readOnly = true)
+    override fun getCart(userId: Long): CartResponse {
+        ensureUserExists(userId)
+        val cart = cartRepository.findByUserId(userId).orElse(null)
+            ?: return emptyCart(userId)
+
+        return buildCartResponse(cart)
+    }
+
+    @Transactional
+    override fun addItem(userId: Long, request: AddCartItemRequest): CartResponse {
+        ensureUserExists(userId)
+        validateProductArticle(request.productArticle)
+        validateQuantity(request.quantity)
+
+        val now = LocalDateTime.now()
+        val cart = getOrCreateCart(userId, now)
+
+        val existingItem = cartItemRepository.findByCartIdAndProductArticle(
+            cartId = requireNotNull(cart.id),
+            productArticle = request.productArticle
+        )
+
+        if (existingItem == null) {
+            cartItemRepository.save(
+                CartItemEntity(
+                    cartId = requireNotNull(cart.id),
+                    productArticle = request.productArticle,
+                    quantity = request.quantity,
+                    createdAt = now,
+                    updatedAt = now
+                )
+            )
+        } else {
+            cartItemRepository.save(
+                existingItem.copy(
+                    quantity = existingItem.quantity + request.quantity,
+                    updatedAt = now
+                )
+            )
+        }
+
+        touchCart(cart, now)
+
+        return buildCartResponseByUserId(userId)
+    }
+
+    @Transactional
+    override fun updateItemQuantity(
+        userId: Long,
+        productArticle: String,
+        request: UpdateCartItemQuantityRequest
+    ): CartResponse {
+        ensureUserExists(userId)
+        validateProductArticle(productArticle)
+        validateQuantity(request.quantity)
+
+        val now = LocalDateTime.now()
+        val cart = getExistingCart(userId)
+
+        val existingItem = cartItemRepository.findByCartIdAndProductArticle(
+            cartId = requireNotNull(cart.id),
+            productArticle = productArticle
+        ) ?: throw IllegalArgumentException("Товар с артикулом $productArticle не найден в корзине")
+
+        cartItemRepository.save(
+            existingItem.copy(
+                quantity = request.quantity,
+                updatedAt = now
+            )
+        )
+
+        touchCart(cart, now)
+
+        return buildCartResponseByUserId(userId)
+    }
+
+    @Transactional
+    override fun removeItem(userId: Long, productArticle: String): CartResponse {
+        ensureUserExists(userId)
+        validateProductArticle(productArticle)
+
+        val cart = cartRepository.findByUserId(userId).orElse(null)
+            ?: return emptyCart(userId)
+
+        cartItemRepository.deleteByCartIdAndProductArticle(
+            cartId = requireNotNull(cart.id),
+            productArticle = productArticle
+        )
+
+        touchCart(cart, LocalDateTime.now())
+
+        return buildCartResponseByUserId(userId)
+    }
+
+    @Transactional
+    override fun clearCart(userId: Long) {
+        ensureUserExists(userId)
+        val cart = cartRepository.findByUserId(userId).orElse(null) ?: return
+
+        cartItemRepository.deleteAllByCartId(requireNotNull(cart.id))
+        touchCart(cart, LocalDateTime.now())
+    }
+
+    private fun getOrCreateCart(userId: Long, now: LocalDateTime): CartEntity {
+        return cartRepository.findByUserId(userId).orElseGet {
+            cartRepository.save(
+                CartEntity(
+                    userId = userId,
+                    createdAt = now,
+                    updatedAt = now
+                )
+            )
+        }
+    }
+
+    private fun getExistingCart(userId: Long): CartEntity {
+        return cartRepository.findByUserId(userId).orElseThrow {
+            IllegalArgumentException("Корзина пользователя $userId не найдена")
+        }
+    }
+
+    private fun touchCart(cart: CartEntity, now: LocalDateTime) {
+        cartRepository.save(cart.copy(updatedAt = now))
+    }
+
+    private fun buildCartResponseByUserId(userId: Long): CartResponse {
+        val cart = getExistingCart(userId)
+        return buildCartResponse(cart)
+    }
+
+    private fun buildCartResponse(cart: CartEntity): CartResponse {
+        val items = cartItemRepository.findAllByCartId(requireNotNull(cart.id))
+            .map { item ->
+                CartItemResponse(
+                    productArticle = item.productArticle,
+                    quantity = item.quantity
+                )
+            }
+
+        return CartResponse(
+            userId = cart.userId,
+            items = items
+        )
+    }
+
+    private fun emptyCart(userId: Long): CartResponse {
+        return CartResponse(
+            userId = userId,
+            items = emptyList()
+        )
+    }
+
+    private fun validateProductArticle(productArticle: String) {
+        require(productArticle.isNotBlank()) {
+            "Артикул товара не должен быть пустым"
+        }
+    }
+
+    private fun validateQuantity(quantity: Int) {
+        require(quantity > 0) {
+            "Количество товара должно быть больше 0"
+        }
+    }
+
+    private fun ensureUserExists(userId: Long) {
+        try {
+            userClient.getUserById(userId)
+        } catch (ex: FeignException.NotFound) {
+            throw UserNotFoundException("Пользователь с id=$userId не найден")
+        } catch (ex: FeignException) {
+            throw IllegalStateException("Ошибка при обращении к user-service")
+        }
+    }
+}

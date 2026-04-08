@@ -1,6 +1,8 @@
+server:
+  port: 8082
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/diploma
+    url: jdbc:postgresql://localhost:5432/order_service_db
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver
@@ -13,3 +15,9 @@ spring:
     sql-migration-separator: "_"
     sql-migration-suffixes: .sql
     out-of-order: false
+
+clients:
+  catalog-service:
+    url: http://localhost:8081
+  user-service:
+    url: http://localhost:8083
