@@ -11,6 +11,8 @@ import ru.alexandr.orderservice.dto.order.UpdateOrderStatusRequest
 import ru.alexandr.orderservice.entity.CartItemEntity
 import ru.alexandr.orderservice.entity.OrderEntity
 import ru.alexandr.orderservice.entity.OrderItemEntity
+import ru.alexandr.orderservice.kafka.OrderCreatedEvent
+import ru.alexandr.orderservice.kafka.OrderEventPublisher
 import ru.alexandr.orderservice.repository.CartItemRepository
 import ru.alexandr.orderservice.repository.CartRepository
 import ru.alexandr.orderservice.repository.OrderItemRepository
@@ -18,6 +20,7 @@ import ru.alexandr.orderservice.repository.OrderRepository
 import ru.alexandr.orderservice.security.CurrentUserProvider
 import java.math.BigDecimal
 import java.time.LocalDateTime
+import java.util.UUID
 
 @Service
 class OrderServiceImpl(
@@ -26,7 +29,7 @@ class OrderServiceImpl(
     private val orderRepository: OrderRepository,
     private val orderItemRepository: OrderItemRepository,
     private val catalogClient: CatalogClient,
-    private val currentUserProvider: CurrentUserProvider
+    private val currentUserProvider: CurrentUserProvider,
 ) : OrderService {
 
 
@@ -43,14 +46,7 @@ class OrderServiceImpl(
         require(cartItems.isNotEmpty()) { "Нельзя оформить пустую корзину" }
 
         val articles = cartItems.map { it.productArticle }.distinct()
-        try {
-            val products = catalogClient.getProductsByArticles(
-                CatalogProductsByArticlesRequest(articles = articles)
-            )
 
-        }catch (e: Exception){
-            println(e)
-        }
         val products = catalogClient.getProductsByArticles(
             CatalogProductsByArticlesRequest(articles = articles)
         )
