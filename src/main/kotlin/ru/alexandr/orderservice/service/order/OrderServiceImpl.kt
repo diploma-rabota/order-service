@@ -3,10 +3,12 @@ package ru.alexandr.orderservice.service.order
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import ru.alexandr.orderservice.client.CatalogClient
+import ru.alexandr.orderservice.dto.CatalogProductDto
 import ru.alexandr.orderservice.dto.cart.CatalogProductsByArticlesRequest
 import ru.alexandr.orderservice.dto.order.OrderItemResponse
 import ru.alexandr.orderservice.dto.order.OrderResponse
 import ru.alexandr.orderservice.dto.order.UpdateOrderStatusRequest
+import ru.alexandr.orderservice.entity.CartItemEntity
 import ru.alexandr.orderservice.entity.OrderEntity
 import ru.alexandr.orderservice.entity.OrderItemEntity
 import ru.alexandr.orderservice.repository.CartItemRepository
@@ -27,6 +29,7 @@ class OrderServiceImpl(
     private val currentUserProvider: CurrentUserProvider
 ) : OrderService {
 
+
     @Transactional
     override fun checkout(): OrderResponse {
         val currentUser = currentUserProvider.getCurrentUser()
@@ -40,6 +43,14 @@ class OrderServiceImpl(
         require(cartItems.isNotEmpty()) { "Нельзя оформить пустую корзину" }
 
         val articles = cartItems.map { it.productArticle }.distinct()
+        try {
+            val products = catalogClient.getProductsByArticles(
+                CatalogProductsByArticlesRequest(articles = articles)
+            )
+
+        }catch (e: Exception){
+            println(e)
+        }
         val products = catalogClient.getProductsByArticles(
             CatalogProductsByArticlesRequest(articles = articles)
         )
@@ -55,14 +66,9 @@ class OrderServiceImpl(
             val product = productMap[cartItem.productArticle]
                 ?: throw IllegalArgumentException("Не найден товар с артикулом ${cartItem.productArticle}")
 
-            val lineTotal = product.price.multiply(BigDecimal.valueOf(cartItem.quantity.toLong()))
-
-            OrderItemEntity(
-                productArticle = product.article,
-                productName = product.name,
-                quantity = cartItem.quantity,
-                price = product.price,
-                lineTotal = lineTotal,
+            buildOrderItem(
+                cartItem = cartItem,
+                product = product,
                 createdAt = now,
             )
         }
@@ -77,13 +83,13 @@ class OrderServiceImpl(
                 userEmail = currentUser.email,
                 totalAmount = totalAmount,
                 createdAt = now,
-                updatedAt = now
+                updatedAt = now,
             )
         )
 
         val savedOrderItems = orderItemRepository.saveAll(
-            orderItems.map {
-                it.copy(orderId = requireNotNull(savedOrder.id))
+            orderItems.map { item ->
+                item.copy(orderId = requireNotNull(savedOrder.id))
             }
         )
 
@@ -174,5 +180,53 @@ class OrderServiceImpl(
                 )
             }
         )
+    }
+
+    private fun buildOrderItem(
+        cartItem: CartItemEntity,
+        product: CatalogProductDto,
+        createdAt: LocalDateTime,
+    ): OrderItemEntity {
+        require(product.isActive) {
+            "Товар с артикулом ${product.article} недоступен для заказа"
+        }
+
+        require(cartItem.quantity > 0) {
+            "Количество товара ${product.article} должно быть больше 0"
+        }
+
+        require(cartItem.quantity <= product.stockQuantity) {
+            "Недостаточно товара ${product.article} на складе. " +
+                    "Доступно: ${product.stockQuantity}, запрошено: ${cartItem.quantity}"
+        }
+
+        val unitPrice = resolveUnitPrice(
+            quantity = cartItem.quantity,
+            retailPrice = product.price,
+            wholesalePrice = product.wholesalePrice,
+            minWholesaleQuantity = product.minWholesaleQuantity,
+        ).setScale(2, java.math.RoundingMode.HALF_UP)
+
+        val lineTotal = unitPrice
+            .multiply(BigDecimal.valueOf(cartItem.quantity.toLong()))
+            .setScale(2, java.math.RoundingMode.HALF_UP)
+
+        return OrderItemEntity(
+            productArticle = product.article,
+            productName = product.name,
+            quantity = cartItem.quantity,
+            price = unitPrice,
+            lineTotal = lineTotal,
+            createdAt = createdAt,
+        )
+    }
+
+    private fun resolveUnitPrice(
+        quantity: Int,
+        retailPrice: BigDecimal,
+        wholesalePrice: BigDecimal,
+        minWholesaleQuantity: Int,
+    ): BigDecimal {
+        return if (quantity >= minWholesaleQuantity) wholesalePrice else retailPrice
     }
 }

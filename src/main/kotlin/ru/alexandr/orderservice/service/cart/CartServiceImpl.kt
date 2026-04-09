@@ -2,9 +2,12 @@ package ru.alexandr.orderservice.service.cart
 
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import ru.alexandr.orderservice.client.CatalogClient
+import ru.alexandr.orderservice.dto.CatalogProductDto
 import ru.alexandr.orderservice.dto.cart.AddCartItemRequest
 import ru.alexandr.orderservice.dto.cart.CartItemResponse
 import ru.alexandr.orderservice.dto.cart.CartResponse
+import ru.alexandr.orderservice.dto.cart.CatalogProductsByArticlesRequest
 import ru.alexandr.orderservice.dto.cart.UpdateCartItemQuantityRequest
 import ru.alexandr.orderservice.entity.CartEntity
 import ru.alexandr.orderservice.entity.CartItemEntity
@@ -18,6 +21,7 @@ class CartServiceImpl(
     private val cartRepository: CartRepository,
     private val cartItemRepository: CartItemRepository,
     private val currentUserProvider: CurrentUserProvider,
+    private val catalogClient: CatalogClient,
 ) : CartService {
 
     @Transactional(readOnly = true)
@@ -45,6 +49,15 @@ class CartServiceImpl(
             productArticle = request.productArticle
         )
 
+        val newQuantity = if (existingItem == null) {
+            request.quantity
+        } else {
+            existingItem.quantity + request.quantity
+        }
+
+        val product = getCatalogProductOrThrow(request.productArticle)
+        validateCatalogProductAvailability(product, newQuantity)
+
         if (existingItem == null) {
             cartItemRepository.save(
                 CartItemEntity(
@@ -58,7 +71,7 @@ class CartServiceImpl(
         } else {
             cartItemRepository.save(
                 existingItem.copy(
-                    quantity = existingItem.quantity + request.quantity,
+                    quantity = newQuantity,
                     updatedAt = now
                 )
             )
@@ -86,6 +99,9 @@ class CartServiceImpl(
             cartId = requireNotNull(cart.id),
             productArticle = productArticle
         ) ?: throw IllegalArgumentException("Товар с артикулом $productArticle не найден в корзине")
+
+        val product = getCatalogProductOrThrow(productArticle)
+        validateCatalogProductAvailability(product, request.quantity)
 
         cartItemRepository.save(
             existingItem.copy(
@@ -156,13 +172,40 @@ class CartServiceImpl(
     }
 
     private fun buildCartResponse(cart: CartEntity): CartResponse {
-        val items = cartItemRepository.findAllByCartId(requireNotNull(cart.id))
-            .map { item ->
-                CartItemResponse(
-                    productArticle = item.productArticle,
-                    quantity = item.quantity
-                )
-            }
+        val cartItems = cartItemRepository.findAllByCartId(requireNotNull(cart.id))
+
+        if (cartItems.isEmpty()) {
+            return CartResponse(
+                userId = cart.userId,
+                items = emptyList()
+            )
+        }
+
+        val articles = cartItems.map { it.productArticle }.distinct()
+        val products = catalogClient.getProductsByArticles(
+            CatalogProductsByArticlesRequest(articles = articles)
+        )
+
+        val productMap = products.associateBy { it.article }
+
+        val items = cartItems.map { item ->
+            val product = productMap[item.productArticle]
+
+            val active = product?.isActive == true
+            val available = product != null &&
+                    product.isActive &&
+                    item.quantity <= product.stockQuantity
+
+            CartItemResponse(
+                productArticle = item.productArticle,
+                productName = product?.name,
+                quantity = item.quantity,
+                price = product?.price,
+                stockQuantity = product?.stockQuantity,
+                active = active,
+                available = available
+            )
+        }
 
         return CartResponse(
             userId = cart.userId,
@@ -186,6 +229,30 @@ class CartServiceImpl(
     private fun validateQuantity(quantity: Int) {
         require(quantity > 0) {
             "Количество товара должно быть больше 0"
+        }
+    }
+
+
+    private fun getCatalogProductOrThrow(article: String): CatalogProductDto {
+        val products = catalogClient.getProductsByArticles(
+            CatalogProductsByArticlesRequest(articles = listOf(article))
+        )
+
+        return products.firstOrNull()
+            ?: throw IllegalArgumentException("Товар с артикулом $article не найден")
+    }
+
+    private fun validateCatalogProductAvailability(
+        product: CatalogProductDto,
+        requestedQuantity: Int
+    ) {
+        require(product.isActive) {
+            "Товар с артикулом ${product.article} недоступен"
+        }
+
+        require(requestedQuantity <= product.stockQuantity) {
+            "Недостаточно товара ${product.article} на складе. " +
+                    "Доступно: ${product.stockQuantity}, запрошено: $requestedQuantity"
         }
     }
 }

@@ -20,25 +20,18 @@ class JwtAuthenticationFilter(
         response: HttpServletResponse,
         filterChain: FilterChain
     ) {
-        println("JWT FILTER START")
-        println("URI = ${request.requestURI}")
+
 
         val authHeader = request.getHeader("Authorization")
-        println("AUTH HEADER = $authHeader")
 
         val beforeAuth = SecurityContextHolder.getContext().authentication
-        println("AUTH BEFORE = $beforeAuth")
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             val token = authHeader.substring(7)
 
-            println("TOKEN VALID = ${jwtUtil.validateToken(token)}")
-            println("TOKEN USER_ID = ${jwtUtil.extractUserId(token)}")
-            println("TOKEN EMAIL = ${jwtUtil.extractEmail(token)}")
 
             val currentAuth = SecurityContextHolder.getContext().authentication
             val shouldAuthenticate = currentAuth == null || currentAuth is AnonymousAuthenticationToken
-            println("SHOULD AUTHENTICATE = $shouldAuthenticate")
 
             if (shouldAuthenticate && jwtUtil.validateToken(token)) {
                 val userId = jwtUtil.extractUserId(token)
@@ -59,16 +52,12 @@ class JwtAuthenticationFilter(
                     authToken.details = WebAuthenticationDetailsSource().buildDetails(request)
                     SecurityContextHolder.getContext().authentication = authToken
 
-                    println("AUTH SET = ${SecurityContextHolder.getContext().authentication}")
                 } else {
-                    println("AUTH NOT SET: userId or email is null")
                 }
             }
         }
 
         filterChain.doFilter(request, response)
 
-        println("AUTH AFTER CHAIN = ${SecurityContextHolder.getContext().authentication}")
-        println("JWT FILTER END")
     }
 }
