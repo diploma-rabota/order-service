@@ -11,15 +11,13 @@ import org.springframework.web.bind.annotation.PathVariable
 )
 interface UserClient {
 
-    @GetMapping("/api/users/{id}")
-    fun getUserById(
-        @PathVariable id: Long
-    ): UserDto
+    @GetMapping("/internal/users/{userId}/email")
+    fun getUserEmail(@PathVariable userId: Long): UserEmailResponse
+
 }
 
 
-data class UserDto(
-    val id: Long,
-    val email: String,
-    val userName: String
+data class UserEmailResponse(
+    val userId: Long,
+    val email: String
 )

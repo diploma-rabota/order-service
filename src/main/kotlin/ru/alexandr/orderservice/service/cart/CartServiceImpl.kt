@@ -3,6 +3,7 @@ package ru.alexandr.orderservice.service.cart
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import ru.alexandr.orderservice.client.CatalogClient
+import ru.alexandr.orderservice.client.UserClient
 import ru.alexandr.orderservice.dto.CatalogProductDto
 import ru.alexandr.orderservice.dto.cart.AddCartItemRequest
 import ru.alexandr.orderservice.dto.cart.CartItemResponse
@@ -22,11 +23,12 @@ class CartServiceImpl(
     private val cartItemRepository: CartItemRepository,
     private val currentUserProvider: CurrentUserProvider,
     private val catalogClient: CatalogClient,
+    private val userClient: UserClient,
 ) : CartService {
 
     @Transactional(readOnly = true)
     override fun getCart(): CartResponse {
-        val userId = currentUserProvider.getCurrentUserId()
+        val userId = getValidatedCurrentUserId()
 
         val cart = cartRepository.findByUserId(userId).orElse(null)
             ?: return emptyCart(userId)
@@ -36,7 +38,7 @@ class CartServiceImpl(
 
     @Transactional
     override fun addItem(request: AddCartItemRequest): CartResponse {
-        val userId = currentUserProvider.getCurrentUserId()
+        val userId = getValidatedCurrentUserId()
 
         validateProductArticle(request.productArticle)
         validateQuantity(request.quantity)
@@ -87,7 +89,7 @@ class CartServiceImpl(
         productArticle: String,
         request: UpdateCartItemQuantityRequest
     ): CartResponse {
-        val userId = currentUserProvider.getCurrentUserId()
+        val userId = getValidatedCurrentUserId()
 
         validateProductArticle(productArticle)
         validateQuantity(request.quantity)
@@ -117,7 +119,7 @@ class CartServiceImpl(
 
     @Transactional
     override fun removeItem(productArticle: String): CartResponse {
-        val userId = currentUserProvider.getCurrentUserId()
+        val userId = getValidatedCurrentUserId()
 
         validateProductArticle(productArticle)
 
@@ -136,12 +138,23 @@ class CartServiceImpl(
 
     @Transactional
     override fun clearCart() {
-        val userId = currentUserProvider.getCurrentUserId()
+        val userId = getValidatedCurrentUserId()
 
         val cart = cartRepository.findByUserId(userId).orElse(null) ?: return
 
         cartItemRepository.deleteAllByCartId(requireNotNull(cart.id))
         touchCart(cart, LocalDateTime.now())
+    }
+
+    private fun getValidatedCurrentUserId(): Long {
+        val userId = currentUserProvider.getCurrentUserId()
+        val userResponse = userClient.getUserEmail(userId)
+
+        require(userResponse.email.isNotBlank()) {
+            "Пользователь с id=$userId не найден"
+        }
+
+        return userId
     }
 
     private fun getOrCreateCart(userId: Long, now: LocalDateTime): CartEntity {
@@ -231,7 +244,6 @@ class CartServiceImpl(
             "Количество товара должно быть больше 0"
         }
     }
-
 
     private fun getCatalogProductOrThrow(article: String): CatalogProductDto {
         val products = catalogClient.getProductsByArticles(

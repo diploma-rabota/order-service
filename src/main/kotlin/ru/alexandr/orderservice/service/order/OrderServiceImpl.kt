@@ -3,24 +3,24 @@ package ru.alexandr.orderservice.service.order
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import ru.alexandr.orderservice.client.CatalogClient
+import ru.alexandr.orderservice.client.UserClient
 import ru.alexandr.orderservice.dto.CatalogProductDto
 import ru.alexandr.orderservice.dto.cart.CatalogProductsByArticlesRequest
+import ru.alexandr.orderservice.dto.enum.OrderStatus
 import ru.alexandr.orderservice.dto.order.OrderItemResponse
 import ru.alexandr.orderservice.dto.order.OrderResponse
 import ru.alexandr.orderservice.dto.order.UpdateOrderStatusRequest
 import ru.alexandr.orderservice.entity.CartItemEntity
 import ru.alexandr.orderservice.entity.OrderEntity
 import ru.alexandr.orderservice.entity.OrderItemEntity
-import ru.alexandr.orderservice.kafka.OrderCreatedEvent
-import ru.alexandr.orderservice.kafka.OrderEventPublisher
 import ru.alexandr.orderservice.repository.CartItemRepository
 import ru.alexandr.orderservice.repository.CartRepository
 import ru.alexandr.orderservice.repository.OrderItemRepository
 import ru.alexandr.orderservice.repository.OrderRepository
 import ru.alexandr.orderservice.security.CurrentUserProvider
 import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.LocalDateTime
-import java.util.UUID
 
 @Service
 class OrderServiceImpl(
@@ -30,16 +30,16 @@ class OrderServiceImpl(
     private val orderItemRepository: OrderItemRepository,
     private val catalogClient: CatalogClient,
     private val currentUserProvider: CurrentUserProvider,
+    private val userClient: UserClient,
 ) : OrderService {
-
 
     @Transactional
     override fun checkout(): OrderResponse {
-        val currentUser = currentUserProvider.getCurrentUser()
+        val user = getValidatedCurrentUser()
         val now = LocalDateTime.now()
 
-        val cart = cartRepository.findByUserId(currentUser.userId).orElseThrow {
-            IllegalArgumentException("Корзина пользователя ${currentUser.userId} не найдена")
+        val cart = cartRepository.findByUserId(user.userId).orElseThrow {
+            IllegalArgumentException("Корзина пользователя ${user.userId} не найдена")
         }
 
         val cartItems = cartItemRepository.findAllByCartId(requireNotNull(cart.id))
@@ -75,8 +75,8 @@ class OrderServiceImpl(
 
         val savedOrder = orderRepository.save(
             OrderEntity(
-                userId = currentUser.userId,
-                userEmail = currentUser.email,
+                userId = user.userId,
+                userEmail = user.email,
                 totalAmount = totalAmount,
                 createdAt = now,
                 updatedAt = now,
@@ -97,7 +97,7 @@ class OrderServiceImpl(
 
     @Transactional(readOnly = true)
     override fun getOrderById(orderId: Long): OrderResponse {
-        val currentUserId = currentUserProvider.getCurrentUserId()
+        val currentUserId = getValidatedCurrentUserId()
 
         val order = orderRepository.findById(orderId).orElseThrow {
             IllegalArgumentException("Заказ с id=$orderId не найден")
@@ -113,7 +113,7 @@ class OrderServiceImpl(
 
     @Transactional(readOnly = true)
     override fun getMyOrders(): List<OrderResponse> {
-        val currentUserId = currentUserProvider.getCurrentUserId()
+        val currentUserId = getValidatedCurrentUserId()
 
         val orders = orderRepository.findAllByUserIdOrderByCreatedAtDesc(currentUserId)
         if (orders.isEmpty()) {
@@ -134,7 +134,7 @@ class OrderServiceImpl(
 
     @Transactional
     override fun updateStatus(orderId: Long, request: UpdateOrderStatusRequest): OrderResponse {
-        val currentUserId = currentUserProvider.getCurrentUserId()
+        val currentUserId = getValidatedCurrentUserId()
 
         val existingOrder = orderRepository.findById(orderId).orElseThrow {
             IllegalArgumentException("Заказ с id=$orderId не найден")
@@ -153,6 +153,32 @@ class OrderServiceImpl(
 
         val items = orderItemRepository.findAllByOrderId(orderId)
         return mapToOrderResponse(updatedOrder, items)
+    }
+
+    private fun getValidatedCurrentUserId(): Long {
+        val userId = currentUserProvider.getCurrentUserId()
+        val userResponse = userClient.getUserEmail(userId)
+
+        require(userResponse.email.isNotBlank()) {
+            "Пользователь с id=$userId не найден"
+        }
+
+        return userId
+    }
+
+    private fun getValidatedCurrentUser(): ValidatedCurrentUser {
+        val userId = currentUserProvider.getCurrentUserId()
+        val userResponse = userClient.getUserEmail(userId)
+
+        val email = userResponse.email
+        require(email.isNotBlank()) {
+            "Пользователь с id=$userId не найден"
+        }
+
+        return ValidatedCurrentUser(
+            userId = userId,
+            email = email
+        )
     }
 
     private fun mapToOrderResponse(
@@ -201,11 +227,11 @@ class OrderServiceImpl(
             retailPrice = product.price,
             wholesalePrice = product.wholesalePrice,
             minWholesaleQuantity = product.minWholesaleQuantity,
-        ).setScale(2, java.math.RoundingMode.HALF_UP)
+        ).setScale(2, RoundingMode.HALF_UP)
 
         val lineTotal = unitPrice
             .multiply(BigDecimal.valueOf(cartItem.quantity.toLong()))
-            .setScale(2, java.math.RoundingMode.HALF_UP)
+            .setScale(2, RoundingMode.HALF_UP)
 
         return OrderItemEntity(
             productArticle = product.article,
@@ -225,4 +251,9 @@ class OrderServiceImpl(
     ): BigDecimal {
         return if (quantity >= minWholesaleQuantity) wholesalePrice else retailPrice
     }
+
+    private data class ValidatedCurrentUser(
+        val userId: Long,
+        val email: String
+    )
 }
