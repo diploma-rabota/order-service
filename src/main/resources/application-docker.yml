@@ -1,0 +1,43 @@
+server:
+  port: 8082
+
+spring:
+  datasource:
+    url: jdbc:postgresql://host.docker.internal:5432/order_service_db
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    sql-migration-prefix: ""
+    sql-migration-separator: "_"
+    sql-migration-suffixes: .sql
+    out-of-order: false
+
+  kafka:
+    bootstrap-servers: host.docker.internal:9094
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+clients:
+  catalog-service:
+    url: http://host.docker.internal:8081
+  user-service:
+    url: http://host.docker.internal:8083
+
+security:
+  jwt:
+    secret: "very-secret-key-very-secret-key-1234567890"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: always
