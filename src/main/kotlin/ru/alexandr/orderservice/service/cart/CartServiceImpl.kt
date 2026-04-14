@@ -12,6 +12,7 @@ import ru.alexandr.orderservice.dto.cart.CatalogProductsByArticlesRequest
 import ru.alexandr.orderservice.dto.cart.UpdateCartItemQuantityRequest
 import ru.alexandr.orderservice.entity.CartEntity
 import ru.alexandr.orderservice.entity.CartItemEntity
+import ru.alexandr.orderservice.metric.OrderMetrics
 import ru.alexandr.orderservice.repository.CartItemRepository
 import ru.alexandr.orderservice.repository.CartRepository
 import ru.alexandr.orderservice.security.CurrentUserProvider
@@ -24,64 +25,85 @@ class CartServiceImpl(
     private val currentUserProvider: CurrentUserProvider,
     private val catalogClient: CatalogClient,
     private val userClient: UserClient,
+    private val orderMetrics: OrderMetrics,
 ) : CartService {
 
     @Transactional(readOnly = true)
     override fun getCart(): CartResponse {
-        val userId = getValidatedCurrentUserId()
+        return try {
+            orderMetrics.cartOperationTimer.recordCallable<CartResponse> {
 
-        val cart = cartRepository.findByUserId(userId).orElse(null)
-            ?: return emptyCart(userId)
+                val userId = getValidatedCurrentUserId()
 
-        return buildCartResponse(cart)
+                val cart = cartRepository.findByUserId(userId).orElse(null)
+                    ?: return@recordCallable emptyCart(userId)
+
+                return@recordCallable buildCartResponse(cart)
+            }!!
+        } catch (ex: Exception) {
+            orderMetrics.cartOperationErrors.increment()
+            throw ex
+        }
+
     }
+
+
 
     @Transactional
     override fun addItem(request: AddCartItemRequest): CartResponse {
-        val userId = getValidatedCurrentUserId()
+        return try {
+            orderMetrics.cartOperationTimer.recordCallable<CartResponse> {
 
-        validateProductArticle(request.productArticle)
-        validateQuantity(request.quantity)
+                val userId = getValidatedCurrentUserId()
 
-        val now = LocalDateTime.now()
-        val cart = getOrCreateCart(userId, now)
+                validateProductArticle(request.productArticle)
+                validateQuantity(request.quantity)
 
-        val existingItem = cartItemRepository.findByCartIdAndProductArticle(
-            cartId = requireNotNull(cart.id),
-            productArticle = request.productArticle
-        )
+                val now = LocalDateTime.now()
+                val cart = getOrCreateCart(userId, now)
 
-        val newQuantity = if (existingItem == null) {
-            request.quantity
-        } else {
-            existingItem.quantity + request.quantity
-        }
-
-        val product = getCatalogProductOrThrow(request.productArticle)
-        validateCatalogProductAvailability(product, newQuantity)
-
-        if (existingItem == null) {
-            cartItemRepository.save(
-                CartItemEntity(
+                val existingItem = cartItemRepository.findByCartIdAndProductArticle(
                     cartId = requireNotNull(cart.id),
-                    productArticle = request.productArticle,
-                    quantity = request.quantity,
-                    createdAt = now,
-                    updatedAt = now
+                    productArticle = request.productArticle
                 )
-            )
-        } else {
-            cartItemRepository.save(
-                existingItem.copy(
-                    quantity = newQuantity,
-                    updatedAt = now
-                )
-            )
+
+                val newQuantity = if (existingItem == null) {
+                    request.quantity
+                } else {
+                    existingItem.quantity + request.quantity
+                }
+
+                val product = getCatalogProductOrThrow(request.productArticle)
+                validateCatalogProductAvailability(product, newQuantity)
+
+                if (existingItem == null) {
+                    cartItemRepository.save(
+                        CartItemEntity(
+                            cartId = requireNotNull(cart.id),
+                            productArticle = request.productArticle,
+                            quantity = request.quantity,
+                            createdAt = now,
+                            updatedAt = now
+                        )
+                    )
+                } else {
+                    cartItemRepository.save(
+                        existingItem.copy(
+                            quantity = newQuantity,
+                            updatedAt = now
+                        )
+                    )
+                }
+
+                touchCart(cart, now)
+
+                return@recordCallable buildCartResponseByUserId(userId)
+            }
+        } catch (ex: Exception) {
+            orderMetrics.cartOperationErrors.increment()
+            throw ex
         }
 
-        touchCart(cart, now)
-
-        return buildCartResponseByUserId(userId)
     }
 
     @Transactional
@@ -89,51 +111,72 @@ class CartServiceImpl(
         productArticle: String,
         request: UpdateCartItemQuantityRequest
     ): CartResponse {
-        val userId = getValidatedCurrentUserId()
 
-        validateProductArticle(productArticle)
-        validateQuantity(request.quantity)
+        return try {
+            orderMetrics.cartOperationTimer.recordCallable<CartResponse> {
 
-        val now = LocalDateTime.now()
-        val cart = getExistingCart(userId)
+                val userId = getValidatedCurrentUserId()
 
-        val existingItem = cartItemRepository.findByCartIdAndProductArticle(
-            cartId = requireNotNull(cart.id),
-            productArticle = productArticle
-        ) ?: throw IllegalArgumentException("Товар с артикулом $productArticle не найден в корзине")
+                validateProductArticle(productArticle)
+                validateQuantity(request.quantity)
 
-        val product = getCatalogProductOrThrow(productArticle)
-        validateCatalogProductAvailability(product, request.quantity)
+                val now = LocalDateTime.now()
+                val cart = getExistingCart(userId)
 
-        cartItemRepository.save(
-            existingItem.copy(
-                quantity = request.quantity,
-                updatedAt = now
-            )
-        )
+                val existingItem = cartItemRepository.findByCartIdAndProductArticle(
+                    cartId = requireNotNull(cart.id),
+                    productArticle = productArticle
+                ) ?: throw IllegalArgumentException("Товар с артикулом $productArticle не найден в корзине")
 
-        touchCart(cart, now)
+                val product = getCatalogProductOrThrow(productArticle)
+                validateCatalogProductAvailability(product, request.quantity)
 
-        return buildCartResponseByUserId(userId)
+                cartItemRepository.save(
+                    existingItem.copy(
+                        quantity = request.quantity,
+                        updatedAt = now
+                    )
+                )
+
+                touchCart(cart, now)
+
+                return@recordCallable buildCartResponseByUserId(userId)
+
+            }
+        } catch (ex: Exception) {
+            orderMetrics.cartOperationErrors.increment()
+            throw ex
+        }
+
     }
 
     @Transactional
     override fun removeItem(productArticle: String): CartResponse {
-        val userId = getValidatedCurrentUserId()
+        return try {
+            orderMetrics.cartOperationTimer.recordCallable<CartResponse> {
 
-        validateProductArticle(productArticle)
+                val userId = getValidatedCurrentUserId()
 
-        val cart = cartRepository.findByUserId(userId).orElse(null)
-            ?: return emptyCart(userId)
+                validateProductArticle(productArticle)
 
-        cartItemRepository.deleteByCartIdAndProductArticle(
-            cartId = requireNotNull(cart.id),
-            productArticle = productArticle
-        )
+                val cart = cartRepository.findByUserId(userId).orElse(null)
+                    ?: return@recordCallable emptyCart(userId)
 
-        touchCart(cart, LocalDateTime.now())
+                cartItemRepository.deleteByCartIdAndProductArticle(
+                    cartId = requireNotNull(cart.id),
+                    productArticle = productArticle
+                )
 
-        return buildCartResponseByUserId(userId)
+                touchCart(cart, LocalDateTime.now())
+
+                return@recordCallable buildCartResponseByUserId(userId)
+
+            }
+        } catch (ex: Exception) {
+            orderMetrics.cartOperationErrors.increment()
+            throw ex
+        }
+
     }
 
     @Transactional
@@ -147,14 +190,21 @@ class CartServiceImpl(
     }
 
     private fun getValidatedCurrentUserId(): Long {
-        val userId = currentUserProvider.getCurrentUserId()
-        val userResponse = userClient.getUserEmail(userId)
+        return try {
+            orderMetrics.userTimer.recordCallable<Long> {
+                val userId = currentUserProvider.getCurrentUserId()
+                val userResponse = userClient.getUserEmail(userId)
 
-        require(userResponse.email.isNotBlank()) {
-            "Пользователь с id=$userId не найден"
+                require(userResponse.email.isNotBlank()) {
+                    "User not found"
+                }
+
+                userId
+            }
+        } catch (ex: Exception) {
+            orderMetrics.userErrors.increment()
+            throw ex
         }
-
-        return userId
     }
 
     private fun getOrCreateCart(userId: Long, now: LocalDateTime): CartEntity {
@@ -245,13 +295,20 @@ class CartServiceImpl(
         }
     }
 
-    private fun getCatalogProductOrThrow(article: String): CatalogProductDto {
-        val products = catalogClient.getProductsByArticles(
-            CatalogProductsByArticlesRequest(articles = listOf(article))
-        )
 
-        return products.firstOrNull()
-            ?: throw IllegalArgumentException("Товар с артикулом $article не найден")
+    private fun getCatalogProductOrThrow(article: String): CatalogProductDto {
+        return try {
+            orderMetrics.catalogTimer.recordCallable<CatalogProductDto> {
+                val products = catalogClient.getProductsByArticles(
+                    CatalogProductsByArticlesRequest(articles = listOf(article))
+                )
+                products.firstOrNull()
+                    ?: throw IllegalArgumentException("Товар с артикулом $article не найден")
+            }
+        } catch (ex: Exception) {
+            orderMetrics.catalogErrors.increment()
+            throw ex
+        }
     }
 
     private fun validateCatalogProductAvailability(
